@@ -1,5 +1,6 @@
 import requests
 from user_data import user_data
+from bs4 import BeautifulSoup
 
 DMV_URL = "https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do"
 
@@ -18,5 +19,7 @@ headers = {
 }
 
 raw_html = requests.post(DMV_URL, headers=headers, data=user_data)
+soup = BeautifulSoup(raw_html, 'html.parser')
 
-print raw_html.text
+print (soup.prettify())
+# print raw_html.text
