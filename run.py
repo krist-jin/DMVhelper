@@ -1,6 +1,10 @@
 import requests
 from user_data import user_data
 from bs4 import BeautifulSoup
+from dateutil.parser import parse as parse_date
+from datetime import datetime
+
+DESIRED_DATE = datetime(2016, 4, 4).date()
 
 DMV_URL = "https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do"
 
@@ -18,8 +22,24 @@ headers = {
 	"Accept-Language": "en-US,en;q=0.8"
 }
 
-raw_html = requests.post(DMV_URL, headers=headers, data=user_data)
+# send http post request
+raw_html = requests.post(DMV_URL, headers=headers, data=user_data).text
+
+# parse html using bs4
 soup = BeautifulSoup(raw_html, 'html.parser')
 
-print (soup.prettify())
-# print raw_html.text
+# extract result from soup result
+result_table = soup.find(id="app_content").table
+first_available_time = result_table.find_all("tr")[2].p.get_text()
+parsed_date = parse_date(first_available_time).date()
+if parsed_date == DESIRED_DATE:
+	print str(DESIRED_DATE) + " is available!"
+else:
+	print str(DESIRED_DATE) + " is not available!" 
+# print raw_html
+# print (soup.prettify())
+# print result_table.prettify()
+# print result_table.get_text()
+# print first_available_time
+
+# //*[@id="app_content"]/table
