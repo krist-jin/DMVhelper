@@ -31,6 +31,7 @@ soup = BeautifulSoup(raw_html, 'html.parser')
 # extract result from soup result
 result_table = soup.find(id="app_content").table
 first_available_time = result_table.find_all("tr")[2].p.get_text()
+print first_available_time
 parsed_date = parse_date(first_available_time).date()
 if parsed_date == DESIRED_DATE:
 	print str(DESIRED_DATE) + " is available!"
@@ -40,6 +41,5 @@ else:
 # print (soup.prettify())
 # print result_table.prettify()
 # print result_table.get_text()
-# print first_available_time
 
 # //*[@id="app_content"]/table
