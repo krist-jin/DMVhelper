@@ -75,7 +75,7 @@ def main():
                 if returnDatetime.time() >= RETURN_TIME:
                     print "%s: %s, return time: %s --- too late" % (office_name, first_available_datetime, returnDatetime.time())
                 elif returnDatetime >= currentAppDatetime:
-                    print "%s: %s, return time: %s --- perfect but not later than current app" % (office_name, first_available_datetime, returnDatetime.time())
+                    print "%s: %s, return time: %s --- later than current app" % (office_name, first_available_datetime, returnDatetime.time())
                 else:
                     print "%s: %s, return time: %s --- perfect and earliest ever" % (office_name, first_available_datetime, returnDatetime.time())
 
