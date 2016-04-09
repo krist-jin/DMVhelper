@@ -36,14 +36,14 @@ INTERVAL = 1 # run every 1 minute
 RETURN_TIME = datetime.time(10, 00) # need another 30 mins to arrive work
 EXAM_AND_WAIT_TIME = datetime.timedelta(hours=1)
 
-def getReturnTime(app_datetime, dis_time):
-    return (app_datetime + EXAM_AND_WAIT_TIME + dis_time).time()
+def getReturnDatetime(app_datetime, dis_time):
+    return (app_datetime + EXAM_AND_WAIT_TIME + dis_time)
 
 def makeApp():
     pass
 
 def getCurrentAppDatetime():
-    pass
+    return datetime.datetime(2016, 1, 1)
 
 def getFirstAvailableAppDatetime(office_name):
     oid, dis_time_minutes = DMV_OFFICES[office_name]
@@ -66,15 +66,19 @@ def main():
     while True:
         try:
             print "\n******* %s *******" % str(datetime.datetime.now())
+            currentAppDatetime = getCurrentAppDatetime()
             for office_name in DMV_OFFICES:
                 first_available_datetime = getFirstAvailableAppDatetime(office_name)
                 oid, dis_time_minutes = DMV_OFFICES[office_name]
                 dis_time = datetime.timedelta(minutes=dis_time_minutes)
-                returnTime = getReturnTime(first_available_datetime, dis_time)
-                if returnTime >= RETURN_TIME:
-                    print "%s: %s, return time: %s --- too late" % (office_name, first_available_datetime, returnTime)
+                returnDatetime = getReturnDatetime(first_available_datetime, dis_time)
+                if returnDatetime.time() >= RETURN_TIME:
+                    print "%s: %s, return time: %s --- too late" % (office_name, first_available_datetime, returnDatetime.time())
+                elif returnDatetime >= currentAppDatetime:
+                    print "%s: %s, return time: %s --- perfect but not later than current app" % (office_name, first_available_datetime, returnDatetime.time())
                 else:
-                    print "%s: %s, return time: %s --- perfect" % (office_name, first_available_datetime, returnTime)
+                    print "%s: %s, return time: %s --- perfect and earliest ever" % (office_name, first_available_datetime, returnDatetime.time())
+
                 
         except Exception, e:
             traceback.print_exc()
