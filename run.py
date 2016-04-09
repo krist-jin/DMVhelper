@@ -34,10 +34,10 @@ HEADERS = {
 INTERVAL = 1 # run every 1 minute
 
 RETURN_TIME = datetime.time(10, 00) # need another 30 mins to arrive work
-EXAM_TIME = datetime.timedelta(hours=1)
+EXAM_AND_WAIT_TIME = datetime.timedelta(hours=1)
 
 def getReturnTime(app_datetime, dis_time):
-    return (app_datetime + EXAM_TIME + dis_time).time()
+    return (app_datetime + EXAM_AND_WAIT_TIME + dis_time).time()
 
 def makeApp():
     pass
@@ -45,32 +45,37 @@ def makeApp():
 def getCurrentAppDatetime():
     pass
 
+def getFirstAvailableAppDatetime(office_name):
+    oid, dis_time_minutes = DMV_OFFICES[office_name]
+    # add office number to user_data
+    user_data_with_office = user_data_1+oid+user_data_2
+
+    # send http post request
+    raw_html = requests.post(DMV_URL, headers=HEADERS, data=user_data_with_office).text
+
+    # parse html using bs4
+    soup = BeautifulSoup(raw_html, 'html.parser')
+
+    # extract result from soup result
+    result_table = soup.find(id="app_content").table
+    first_available_datetime = result_table.find_all("tr")[2].p.get_text()
+    return parse_datetime(first_available_datetime)
+    
+
 def main():
     while True:
         try:
             print "\n******* %s *******" % str(datetime.datetime.now())
-            for office in DMV_OFFICES:
-                oid, dis_time_minutes = DMV_OFFICES[office]
+            for office_name in DMV_OFFICES:
+                first_available_datetime = getFirstAvailableAppDatetime(office_name)
+                oid, dis_time_minutes = DMV_OFFICES[office_name]
                 dis_time = datetime.timedelta(minutes=dis_time_minutes)
-                # add office number to user_data
-                user_data_with_office = user_data_1+oid+user_data_2
-                # send http post request
-                raw_html = requests.post(DMV_URL, headers=HEADERS, data=user_data_with_office).text
-
-                # parse html using bs4
-                soup = BeautifulSoup(raw_html, 'html.parser')
-
-                # extract result from soup result
-                result_table = soup.find(id="app_content").table
-                first_available_time = result_table.find_all("tr")[2].p.get_text()
-                # parsed_date = parse_datetime(first_available_time).date()
-                parsed_datetime = parse_datetime(first_available_time)
-                returnTime = getReturnTime(parsed_datetime, dis_time)
-                # parsed_time = parsed_datetime.time()
+                returnTime = getReturnTime(first_available_datetime, dis_time)
                 if returnTime >= RETURN_TIME:
-                    print "%s: %s, return time: %s --- too late" % (office, first_available_time, returnTime)
+                    print "%s: %s, return time: %s --- too late" % (office_name, first_available_datetime, returnTime)
                 else:
-                    print "%s: %s, return time: %s --- perfect" % (office, first_available_time, returnTime)
+                    print "%s: %s, return time: %s --- perfect" % (office_name, first_available_datetime, returnTime)
+                
         except Exception, e:
             traceback.print_exc()
             time.sleep(INTERVAL*60)
