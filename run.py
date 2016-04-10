@@ -1,14 +1,16 @@
 import requests
-from user_data import user_data_1, user_data_2
+from user_data import user_data_1, user_data_2, DMVBody, cr_list, rf_dict, pd_dict
 from bs4 import BeautifulSoup
 from dateutil.parser import parse as parse_datetime
 import datetime
 import time
 import traceback
+import random
+import urllib
 
 # DESIRED_DATE = datetime(2016, 4, 4).date()
 
-DMV_URL = "https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do"
+# DMV_URL = "https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do"
 DMV_OFFICES = {
     "santa clara": ("632", 18), # 18 mins
     "san jose": ("516", 24),  # 24 mins
@@ -43,16 +45,36 @@ def makeApp():
     pass
 
 def getCurrentAppDatetime():
-    return datetime.datetime(2016, 1, 1)
+    DMVBody[1] = ("TS0141aebd_cr", cr_list[0])
+    DMVBody[5] = ("TS0141aebd_rf", rf_dict["searchAppts"])
+    DMVBody[7] = ("TS0141aebd_pd", pd_dict["searchAppts"])
+    # print urllib.urlencode(DMVBody)
+    raw_html = requests.post(rf_dict["searchAppts"], headers=HEADERS, data=urllib.urlencode(DMVBody)).text
+    # parse html using bs4
+    soup = BeautifulSoup(raw_html, 'html.parser')
+    # extract result from soup result
+    result_table = soup.find(id="ApptForm").find_all("table")[0]
+    # print raw_html
+    # print result_table
+    # print result_table.find_all("tr")[0].find_all("td")[1]
+    current_app = result_table.find_all("tr")[0].find_all("td")[1].get_text()
+    dt_beg_idx = current_app.find("Date/Time: ")+11
+    dt_end_idx = current_app.find("Confirmation Number")-1
+    current_datetime = current_app[dt_beg_idx:dt_end_idx]
+    # print current_datetime
+    return parse_datetime(current_datetime)
+    # return datetime.datetime(2016, 1, 1)
 
 def getFirstAvailableAppDatetime(office_name):
     oid, dis_time_minutes = DMV_OFFICES[office_name]
     # add office number to user_data
-    user_data_with_office = user_data_1+oid+user_data_2
-
+    # user_data_with_office = user_data_1+oid+user_data_2
+    DMVBody[1] = ("TS0141aebd_cr", cr_list[0])
+    DMVBody[5] = ("TS0141aebd_rf", rf_dict["findDriveTest"])
+    DMVBody[7] = ("TS0141aebd_pd", pd_dict["findDriveTest"] % str(oid))
     # send http post request
-    raw_html = requests.post(DMV_URL, headers=HEADERS, data=user_data_with_office).text
-
+    raw_html = requests.post(rf_dict["findDriveTest"], headers=HEADERS, data=urllib.urlencode(DMVBody)).text
+    # raw_html = requests.post(rf_dict["findDriveTest"], headers=HEADERS, data=user_data_with_office).text
     # parse html using bs4
     soup = BeautifulSoup(raw_html, 'html.parser')
 
@@ -79,14 +101,17 @@ def main():
                 else:
                     print "%s: %s, return time: %s --- perfect and earliest ever" % (office_name, first_available_datetime, returnDatetime.time())
                     makeApp()
-
+                time.sleep(1)
                 
         except Exception, e:
             traceback.print_exc()
-            time.sleep(INTERVAL*60)
+            time.sleep(INTERVAL*33)
             continue
         else: # succeed
-            time.sleep(INTERVAL*60)
+            time.sleep(INTERVAL*33)
+
+def test():
+    getCurrentAppDatetime()
 
 if __name__ == '__main__':
     main()
