@@ -43,11 +43,16 @@ def getCommonCookies():
     commonCookies1 = []
     
     # get first part of common cookies at welcome page
-    r = requests.get(URLS['welcome'], headers=HEADERS)
-    cookie_string1 = r.headers.get('Set-Cookie')
-    if cookie_string1:
-        commonCookies1 = cookie_string1.rstrip('; Path=/').split('; Path=/, ')
-    commonCookies1 = list(set(commonCookies1))  # remove duplicates
+    while True:
+        r = requests.get(URLS['welcome'], headers=HEADERS)
+        cookie_string1 = r.headers.get('Set-Cookie')
+        if cookie_string1:
+            commonCookies1 = cookie_string1.rstrip('; Path=/').split('; Path=/, ')
+            commonCookies1 = list(set(commonCookies1))  # remove duplicates
+            break
+        else:
+            print "retry get CommonCookies1"
+            time.sleep(1)
 
     # get the other part of common cookies at /wasapp/foa/clear.do
     this_headers = deepcopy(HEADERS)
@@ -58,30 +63,44 @@ def getCommonCookies():
     this_body[5] = ("TS0141aebd_rf", URLS["welcome"])
     this_body[6] = ("TS0141aebd_ct", 0)
     this_body[7] = ("TS0141aebd_pd", 0)
-    r = requests.post(URLS['clear'], headers=this_headers, data=this_body)
-    cookie_string2 = r.headers.get('Set-Cookie')
-    if cookie_string2:
-        commonCookies2 = cookie_string2.rstrip('; Path=/').split('; Path=/, ')
+    while True:
+        r = requests.post(URLS['clear'], headers=this_headers, data=this_body)
+        cookie_string2 = r.headers.get('Set-Cookie')
+        if cookie_string2:
+            commonCookies2 = cookie_string2.rstrip('; Path=/').split('; Path=/, ')
+            break
+        else:
+            print "retry get CommonCookies2"
+            time.sleep(1)
     
     # combine two parts
     return commonCookies1[:2] + commonCookies2[1:]
 
+def isPageValid(html_text):
+    return html_text and "Please enable JavaScript" not in html_text
+
 def getCurrentAppDatetime(commonCookies):
     this_headers = deepcopy(HEADERS)
     this_headers["Cookie"] = "; ".join(commonCookies)
-    r = requests.post(URLS["searchAppts"], headers=this_headers, data=searchAppts_body)
-    print r.text
-    # # parse html using bs4
-    # soup = BeautifulSoup(r.text, 'html.parser')
+    while True:
+        r = requests.post(URLS["searchAppts"], headers=this_headers, data=searchAppts_body)
+        if isPageValid(r.text):
+            break
+        else:
+            print "retry getCurrentAppDatetime"
+            time.sleep(1)
+    # print r.text
+    # parse html using bs4
+    soup = BeautifulSoup(r.text, 'html.parser')
     
-    # # extract result from soup result
-    # result_table = soup.find(id="ApptForm").find_all("table")[0]
-    # current_app = result_table.find_all("tr")[0].find_all("td")[1].get_text()
-    # dt_beg_idx = current_app.find("Date/Time: ")+11
-    # dt_end_idx = current_app.find("Confirmation Number")-1
-    # current_datetime = current_app[dt_beg_idx:dt_end_idx]
+    # extract result from soup result
+    result_table = soup.find(id="ApptForm").find_all("table")[0]
+    current_app = result_table.find_all("tr")[0].find_all("td")[1].get_text()
+    dt_beg_idx = current_app.find("Date/Time: ")+11
+    dt_end_idx = current_app.find("Confirmation Number")-1
+    current_datetime = current_app[dt_beg_idx:dt_end_idx]
     # print parse_datetime(current_datetime)
-    # # return parse_datetime(current_datetime)
+    return parse_datetime(current_datetime)
 
 def getFirstAvailableAppDatetime():
     pass
