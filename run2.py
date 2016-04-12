@@ -43,6 +43,14 @@ URLS = {
     "cancelDriveTest": "https://www.dmv.ca.gov/wasapp/foa/cancelDriveTest.do"
 }
 
+INTERVAL = 1 # run every 1 minute
+
+RETURN_TIME = datetime.time(10, 00) # need another 30 mins to arrive work
+EXAM_AND_WAIT_TIME = datetime.timedelta(hours=1)
+
+def repeatRequest(name, headers, body):
+    pass
+
 def getCommonCookies():
     commonCookies1 = []
     
@@ -83,7 +91,7 @@ def getCommonCookies():
 def isPageValid(html_text):
     return html_text and "Please enable JavaScript" not in html_text
 
-def getCurrentAppDatetime(commonCookies):
+def getCurrentApp(commonCookies):
     this_headers = deepcopy(HEADERS)
     this_headers["Cookie"] = "; ".join(commonCookies)
     while True:
@@ -91,7 +99,7 @@ def getCurrentAppDatetime(commonCookies):
         if isPageValid(r.text):
             break
         else:
-            print "retry getCurrentAppDatetime"
+            print "retry getCurrentApp"
             time.sleep(1)
     # print r.text
     # parse html using bs4
@@ -100,11 +108,14 @@ def getCurrentAppDatetime(commonCookies):
     # extract result from soup result
     result_table = soup.find(id="ApptForm").find_all("table")[0]
     current_app = result_table.find_all("tr")[0].find_all("td")[1].get_text()
+    office_beg_idx = current_app.find("Office: ")+8
+    office_end_idx = current_app.find("Purpose:")
+    current_office = current_app[office_beg_idx:office_end_idx]
     dt_beg_idx = current_app.find("Date/Time: ")+11
     dt_end_idx = current_app.find("Confirmation Number")-1
     current_datetime = current_app[dt_beg_idx:dt_end_idx]
     # print parse_datetime(current_datetime)
-    return parse_datetime(current_datetime)
+    return current_office, parse_datetime(current_datetime)
 
 def getFirstAvailableAppDatetime(office_name, commonCookies):
     oid, dis_time_minutes = DMV_OFFICES[office_name]
@@ -131,14 +142,7 @@ def getFirstAvailableAppDatetime(office_name, commonCookies):
     
     # get code from js
     js_code = "3333_"+re.search('a={c:"TS0141aebd_77",d:"(.*)",n:"1000', r.text).group(1)
-    # tricky_cookie_string = "TS0141aebd_77=3333_%s_rsb_0_rs_https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do_rs_0_rs_0" % code
-    # newCookies = deepcopy(commonCookies)
-    # print newCookies
-    # print tricky_cookie
-    # print urllib.urlencode(tricky_cookie)
-    # newCookies.append(urllib.urlencode(tricky_cookie_string))
-    # print newCookies
-    return first_available_datetime, js_code
+    return parse_datetime(first_available_datetime), js_code
 
 
 def getReturnDatetime(app_datetime, office_name):
@@ -147,43 +151,31 @@ def getReturnDatetime(app_datetime, office_name):
     return (app_datetime + EXAM_AND_WAIT_TIME + dis_time)
 
 def makeApp(commonCookies, js_code):
-    # # post to reviewDriveTest.do
-    # this_headers = deepcopy(HEADERS)
-    # newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_0_rs_0" % (js_code, urllib.quote_plus(URLS["findDriveTest"]))]
-    # this_headers["Cookie"] = "; ".join(newCookies)
-    # while True:
-    #     r = requests.post(URLS['reviewDriveTest'], headers=this_headers)
-    #     if isPageValid(r.text):
-    #         break
-    #     else:
-    #         print "retry reviewDriveTest"
-    # soup = BeautifulSoup(r.text, 'html.parser')
-    # print r.text
-
     this_headers = deepcopy(HEADERS)
-    newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_1_rs_0" % (js_code, urllib.quote_plus(URLS["findDriveTest"]))]
-    this_headers["Cookie"] = "; ".join(newCookies)
-    r = requests.post(URLS['confirmDriveTest'], headers=this_headers)
-    print r.text
+    while True:
+        # confirm page
+        newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_1_rs_0" % (js_code, urllib.quote_plus(URLS["findDriveTest"]))]
+        this_headers["Cookie"] = "; ".join(newCookies)
+        requests.post(URLS['confirmDriveTest'], headers=this_headers)
 
-    newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_1_rs_0" % (js_code, urllib.quote_plus(URLS["reviewDriveTest"]))]
-    this_headers["Cookie"] = "; ".join(newCookies)
-    # while True:
-    r = requests.post(URLS['cancelDriveTest'], headers=this_headers)
-    print r.text
-        # if isPageValid(r.text):
-        #     break
-        # else:
-        #     print "retry cancelDriveTest"
-        #     time.sleep(1)
-    # soup = BeautifulSoup(r.text, 'html.parser')
+        # cancel page
+        newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_1_rs_0" % (js_code, urllib.quote_plus(URLS["reviewDriveTest"]))]
+        this_headers["Cookie"] = "; ".join(newCookies)
+        r = requests.post(URLS['cancelDriveTest'], headers=this_headers)
+        if "Your confirmation number is" in r.text:
+            print "confirmed!"
+            break
+        else:
+            print "retry makeApp"
+            time.sleep(1)
 
 def main():
     while True:
         try:
             print "\n******* %s *******" % str(datetime.datetime.now())
             commonCookies = getCommonCookies()
-            currentAppDatetime = getCurrentAppDatetime(commonCookies)
+            currentAppOffice, currentAppDatetime = getCurrentApp(commonCookies)
+            print "current appontment: %s @ %s" % (currentAppDatetime, currentAppOffice)
             for office_name in DMV_OFFICES:
                 first_available_datetime, js_code = getFirstAvailableAppDatetime(office_name, commonCookies)
                 returnDatetime = getReturnDatetime(first_available_datetime, office_name)
@@ -205,11 +197,12 @@ def main():
 
 def test():
     commonCookies = getCommonCookies()
-    # currentAppDatetime = getCurrentAppDatetime(commonCookies)
-    first_available_datetime, js_code = getFirstAvailableAppDatetime("santa clara", commonCookies)
-    print first_available_datetime
-    makeApp(commonCookies, js_code)
+    currentAppOffice, currentAppDatetime = getCurrentApp(commonCookies)
+    print currentAppOffice, currentAppDatetime
+    # first_available_datetime, js_code = getFirstAvailableAppDatetime("santa clara", commonCookies)
+    # print first_available_datetime
+    # makeApp(commonCookies, js_code)
 
 
 if __name__ == '__main__':
-    test()
+    main()
