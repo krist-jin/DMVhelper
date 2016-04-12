@@ -1,5 +1,5 @@
 import requests
-from user_data import user_data_1, user_data_2, DMVBody, cr_list, rf_dict, pd_dict, searchAppts_body
+from user_data import user_data_1, user_data_2, DMVBody, cr_list, rf_dict, pd_dict, searchAppts_body, findDriveTest_body
 from bs4 import BeautifulSoup
 from dateutil.parser import parse as parse_datetime
 import datetime
@@ -36,7 +36,9 @@ HEADERS = {
 URLS = {
     "welcome": "https://www.dmv.ca.gov/portal/dmv/detail/portal/foa/welcome/",
     "clear": "https://www.dmv.ca.gov/wasapp/foa/clear.do?goTo=driveTest&localeName=en",
-    "searchAppts": "https://www.dmv.ca.gov/wasapp/foa/searchAppts.do"
+    "searchAppts": "https://www.dmv.ca.gov/wasapp/foa/searchAppts.do",
+    "findDriveTest": "https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do",
+    "reviewDriveTest": "https://www.dmv.ca.gov/wasapp/foa/reviewDriveTest.do"
 }
 
 def getCommonCookies():
@@ -71,7 +73,7 @@ def getCommonCookies():
             break
         else:
             print "retry get CommonCookies2"
-            time.sleep(1)
+            time.sleep(3)
     
     # combine two parts
     return commonCookies1[:2] + commonCookies2[1:]
@@ -102,16 +104,61 @@ def getCurrentAppDatetime(commonCookies):
     # print parse_datetime(current_datetime)
     return parse_datetime(current_datetime)
 
-def getFirstAvailableAppDatetime():
-    pass
+def getFirstAvailableAppDatetime(office_name, commonCookies):
+    oid, dis_time_minutes = DMV_OFFICES[office_name]
+    this_headers = deepcopy(HEADERS)
+    this_headers["Cookie"] = "; ".join(commonCookies)
+    this_body = deepcopy(findDriveTest_body)
+    this_body[1] = ("officeId", oid)
+    while True:
+        r = requests.post(URLS["findDriveTest"], headers=this_headers, data=this_body)
+        if isPageValid(r.text):
+            break
+        else:
+            print "retry getFirstAvailableAppDatetime"
+            time.sleep(1)
+    
+    print r.text
+
+    # parse html using bs4
+    soup = BeautifulSoup(r.text, 'html.parser')
+
+    # extract result from soup result
+    result_table = soup.find(id="app_content").table
+    first_available_datetime = result_table.find_all("tr")[2].p.get_text()
+    
+    # get code from js
+    js_code = "3333_"+re.search('a={c:"TS0141aebd_77",d:"(.*)",n:"1000', r.text).group(1)
+    # tricky_cookie_string = "TS0141aebd_77=3333_%s_rsb_0_rs_https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do_rs_0_rs_0" % code
+    # newCookies = deepcopy(commonCookies)
+    # print newCookies
+    # print tricky_cookie
+    # print urllib.urlencode(tricky_cookie)
+    # newCookies.append(urllib.urlencode(tricky_cookie_string))
+    # print newCookies
+    return first_available_datetime, js_code
+
 
 def getReturnDatetime(app_datetime, office_name):
     oid, dis_time_minutes = DMV_OFFICES[office_name]
     dis_time = datetime.timedelta(minutes=dis_time_minutes)
     return (app_datetime + EXAM_AND_WAIT_TIME + dis_time)
 
-def makeApp(newCookies):
-    pass
+def makeApp(commonCookies, js_code):
+    # post to reviewDriveTest.do
+    this_headers = deepcopy(HEADERS)
+    newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_0_rs_0" % (js_code, urllib.quote_plus(URLS["findDriveTest"]))]
+    this_headers["Cookie"] = "; ".join(newCookies)
+    # while True:
+    r = requests.post(URLS['reviewDriveTest'], headers=this_headers)
+    print r.text
+        # cookie_string2 = r.headers.get('Set-Cookie')
+        # if cookie_string2:
+        #     commonCookies2 = cookie_string2.rstrip('; Path=/').split('; Path=/, ')
+        #     break
+        # else:
+        #     print "retry get CommonCookies2"
+        #     time.sleep(3)
 
 def main():
     while True:
@@ -120,7 +167,7 @@ def main():
             commonCookies = getCommonCookies()
             currentAppDatetime = getCurrentAppDatetime(commonCookies)
             for office_name in DMV_OFFICES:
-                first_available_datetime, newCookies = getFirstAvailableAppDatetime(office_name, commonCookies)
+                first_available_datetime, js_code = getFirstAvailableAppDatetime(office_name, commonCookies)
                 returnDatetime = getReturnDatetime(first_available_datetime, office_name)
                 if returnDatetime.time() >= RETURN_TIME:
                     print "%s: %s, return time: %s --- too late" % (office_name, first_available_datetime, returnDatetime.time())
@@ -128,7 +175,7 @@ def main():
                     print "%s: %s, return time: %s --- later than current app" % (office_name, first_available_datetime, returnDatetime.time())
                 else:
                     print "%s: %s, return time: %s --- perfect and earliest ever" % (office_name, first_available_datetime, returnDatetime.time())
-                    makeApp(newCookies)
+                    makeApp(commonCookies, js_code)
                 time.sleep(1)
                 
         except Exception, e:
@@ -140,7 +187,10 @@ def main():
 
 def test():
     commonCookies = getCommonCookies()
-    getCurrentAppDatetime(commonCookies)
+    # currentAppDatetime = getCurrentAppDatetime(commonCookies)
+    first_available_datetime, js_code = getFirstAvailableAppDatetime("santa clara", commonCookies)
+    makeApp(commonCookies, js_code)
+
 
 if __name__ == '__main__':
     test()

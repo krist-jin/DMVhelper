@@ -33,3 +33,19 @@ searchAppts_body = [
     ("telPrefix", "714"),
     ("telSuffix", "4594")
 ]
+
+findDriveTest_body = [
+    ("numberItems", "1"),
+    ("officeId", ""),
+    ("requestedTask", "DT"),
+    ("firstName", "bo"),
+    ("lastName", "jin"),
+    ("dlNumber", "y3180379"),
+    ("birthMonth", "08"),
+    ("birthDay", "17"),
+    ("birthYear", "1992"),
+    ("telArea", "917"),
+    ("telPrefix", "714"),
+    ("telSuffix", "4594"),
+    ("resetCheckFields", "true")
+]
