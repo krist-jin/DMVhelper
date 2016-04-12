@@ -38,7 +38,9 @@ URLS = {
     "clear": "https://www.dmv.ca.gov/wasapp/foa/clear.do?goTo=driveTest&localeName=en",
     "searchAppts": "https://www.dmv.ca.gov/wasapp/foa/searchAppts.do",
     "findDriveTest": "https://www.dmv.ca.gov/wasapp/foa/findDriveTest.do",
-    "reviewDriveTest": "https://www.dmv.ca.gov/wasapp/foa/reviewDriveTest.do"
+    "reviewDriveTest": "https://www.dmv.ca.gov/wasapp/foa/reviewDriveTest.do",
+    "confirmDriveTest": "https://www.dmv.ca.gov/wasapp/foa/confirmDriveTest.do",
+    "cancelDriveTest": "https://www.dmv.ca.gov/wasapp/foa/cancelDriveTest.do"
 }
 
 def getCommonCookies():
@@ -118,7 +120,7 @@ def getFirstAvailableAppDatetime(office_name, commonCookies):
             print "retry getFirstAvailableAppDatetime"
             time.sleep(1)
     
-    print r.text
+    # print r.text
 
     # parse html using bs4
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -145,20 +147,36 @@ def getReturnDatetime(app_datetime, office_name):
     return (app_datetime + EXAM_AND_WAIT_TIME + dis_time)
 
 def makeApp(commonCookies, js_code):
-    # post to reviewDriveTest.do
+    # # post to reviewDriveTest.do
+    # this_headers = deepcopy(HEADERS)
+    # newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_0_rs_0" % (js_code, urllib.quote_plus(URLS["findDriveTest"]))]
+    # this_headers["Cookie"] = "; ".join(newCookies)
+    # while True:
+    #     r = requests.post(URLS['reviewDriveTest'], headers=this_headers)
+    #     if isPageValid(r.text):
+    #         break
+    #     else:
+    #         print "retry reviewDriveTest"
+    # soup = BeautifulSoup(r.text, 'html.parser')
+    # print r.text
+
     this_headers = deepcopy(HEADERS)
-    newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_0_rs_0" % (js_code, urllib.quote_plus(URLS["findDriveTest"]))]
+    newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_1_rs_0" % (js_code, urllib.quote_plus(URLS["findDriveTest"]))]
+    this_headers["Cookie"] = "; ".join(newCookies)
+    r = requests.post(URLS['confirmDriveTest'], headers=this_headers)
+    print r.text
+
+    newCookies = commonCookies+["TS0141aebd_77=%s_rsb_0_rs_%s_rs_1_rs_0" % (js_code, urllib.quote_plus(URLS["reviewDriveTest"]))]
     this_headers["Cookie"] = "; ".join(newCookies)
     # while True:
-    r = requests.post(URLS['reviewDriveTest'], headers=this_headers)
+    r = requests.post(URLS['cancelDriveTest'], headers=this_headers)
     print r.text
-        # cookie_string2 = r.headers.get('Set-Cookie')
-        # if cookie_string2:
-        #     commonCookies2 = cookie_string2.rstrip('; Path=/').split('; Path=/, ')
+        # if isPageValid(r.text):
         #     break
         # else:
-        #     print "retry get CommonCookies2"
-        #     time.sleep(3)
+        #     print "retry cancelDriveTest"
+        #     time.sleep(1)
+    # soup = BeautifulSoup(r.text, 'html.parser')
 
 def main():
     while True:
@@ -189,6 +207,7 @@ def test():
     commonCookies = getCommonCookies()
     # currentAppDatetime = getCurrentAppDatetime(commonCookies)
     first_available_datetime, js_code = getFirstAvailableAppDatetime("santa clara", commonCookies)
+    print first_available_datetime
     makeApp(commonCookies, js_code)
 
 
