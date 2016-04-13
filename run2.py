@@ -61,29 +61,26 @@ def getCommonCookies():
         if cookie_string1:
             commonCookies1 = cookie_string1.rstrip('; Path=/').split('; Path=/, ')
             commonCookies1 = list(set(commonCookies1))  # remove duplicates
-            break
+            # get the other part of common cookies at /wasapp/foa/clear.do
+            this_headers = deepcopy(HEADERS)
+            this_headers["Cookie"] = "; ".join(commonCookies1)
+            this_body = deepcopy(DMVBody)
+            this_body[1] = ("TS0141aebd_cr", cr_list[0])
+            this_body[4] = ("TS0141aebd_md", 1)
+            this_body[5] = ("TS0141aebd_rf", URLS["welcome"])
+            this_body[6] = ("TS0141aebd_ct", 0)
+            this_body[7] = ("TS0141aebd_pd", 0)
+            r = requests.post(URLS['clear'], headers=this_headers, data=this_body)
+            cookie_string2 = r.headers.get('Set-Cookie')
+            if cookie_string2:
+                commonCookies2 = cookie_string2.rstrip('; Path=/').split('; Path=/, ')
+                break
+            else:
+                print "retry get CommonCookies2"
+                time.sleep(3)
         else:
             print "retry get CommonCookies1"
             time.sleep(1)
-
-    # get the other part of common cookies at /wasapp/foa/clear.do
-    this_headers = deepcopy(HEADERS)
-    this_headers["Cookie"] = "; ".join(commonCookies1)
-    this_body = deepcopy(DMVBody)
-    this_body[1] = ("TS0141aebd_cr", cr_list[0])
-    this_body[4] = ("TS0141aebd_md", 1)
-    this_body[5] = ("TS0141aebd_rf", URLS["welcome"])
-    this_body[6] = ("TS0141aebd_ct", 0)
-    this_body[7] = ("TS0141aebd_pd", 0)
-    while True:
-        r = requests.post(URLS['clear'], headers=this_headers, data=this_body)
-        cookie_string2 = r.headers.get('Set-Cookie')
-        if cookie_string2:
-            commonCookies2 = cookie_string2.rstrip('; Path=/').split('; Path=/, ')
-            break
-        else:
-            print "retry get CommonCookies2"
-            time.sleep(3)
     
     # combine two parts
     return commonCookies1[:2] + commonCookies2[1:]
@@ -94,6 +91,7 @@ def isPageValid(html_text):
 def getCurrentApp(commonCookies):
     this_headers = deepcopy(HEADERS)
     this_headers["Cookie"] = "; ".join(commonCookies)
+    count = 0
     while True:
         r = requests.post(URLS["searchAppts"], headers=this_headers, data=searchAppts_body)
         if isPageValid(r.text):
@@ -101,6 +99,9 @@ def getCurrentApp(commonCookies):
         else:
             print "retry getCurrentApp"
             time.sleep(1)
+            count += 1
+            if count >=10:
+                time.sleep(10)
     # print r.text
     # parse html using bs4
     soup = BeautifulSoup(r.text, 'html.parser')
